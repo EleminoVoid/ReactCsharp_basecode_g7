@@ -4,6 +4,7 @@ using ASI.Basecode.Services.Interfaces;
 using ASI.Basecode.Services.Manager;
 using AutoMapper;
 using System.Linq;
+using System.Threading.Tasks;
 using static ASI.Basecode.Resources.Constants.Enums;
 
 namespace ASI.Basecode.Services.Services
@@ -23,10 +24,15 @@ namespace ASI.Basecode.Services.Services
         {
             user = new User();
             var passwordKey = PasswordManager.EncryptPassword(password);
-            user = _repository.GetUsers().Where(x => x.UserId == userId &&
+            user = _repository.GetUsers().Where(x => x.Id == userId &&
                                                      x.Password == passwordKey).FirstOrDefault();
 
             return user != null ? LoginResult.Success : LoginResult.Failed;
+        }
+
+        public async Task<User> GetUser(string userId)
+        {
+            return await Task.FromResult(_repository.GetUsers().FirstOrDefault(x => x.Id == userId));
         }
     }
 }

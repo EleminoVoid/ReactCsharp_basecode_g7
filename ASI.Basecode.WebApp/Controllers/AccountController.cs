@@ -35,7 +35,7 @@ namespace ASI.Basecode.WebApp.Controllers
         /// <param name="configuration">The configuration.</param>
         /// <param name="mapper">The mapper.</param>
         /// <param name="tokenValidationParametersFactory">The token validation parameters factory.</param>
-        /// <param name="tokenProviderOptionsFactory">The token provider options factory.</param>
+        /// <param name="tokenProviderOptionsFactory">The token provider tions factory.</param>
         public AccountController(
                             SignInManager signInManager,
                             IHttpContextAccessor httpContextAccessor,
@@ -61,25 +61,45 @@ namespace ASI.Basecode.WebApp.Controllers
         [HttpPost]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginViewModel model)
-
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var user = await _userService.GetUser(model.UserId);
+            if (user == null)
+            {
+                return Unauthorized("Invalid username or password");
+            }
+
+            var isValidPassword = PasswordManager.VerifyPassword(model.Password, user.Password);
+            if (!isValidPassword)
+            {
+                return Unauthorized("Invalid username or password");
+            }
+
+            await this._signInManager.SignInAsync(user);
             this._session.SetString("HasSession", "Exist");
+            this._session.SetString("UserName", user.Username);
 
-            User user = null;
-
-            //await this._signInManager.SignInAsync(user);
-            this._session.SetString("UserName", model.UserId);
-
-            return Ok(user);
+            return Ok(new { 
+                user.Id,
+                user.Username,
+                user.Email,
+                user.Role
+            });
         }
 
         /// <summary>
         /// Sign Out current account
         /// </summary>
         [AllowAnonymous]
+        [HttpPost]
         public async Task<IActionResult> SignOutUser()
         {
             await this._signInManager.SignOutAsync();
+            this._session.Clear();
             return Ok();
         }
     }

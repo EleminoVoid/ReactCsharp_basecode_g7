@@ -94,5 +94,23 @@ namespace ASI.Basecode.Services.Manager
             }
         }
 
+        /// <summary>
+        /// Verifies if the provided password matches the encrypted password
+        /// </summary>
+        /// <param name="providedPassword">The password to verify</param>
+        /// <param name="encryptedPassword">The encrypted password to compare against</param>
+        /// <returns>True if passwords match, false otherwise</returns>
+        public static bool VerifyPassword(string providedPassword, string encryptedPassword)
+        {
+            try
+            {
+                string decryptedPassword = DecryptPassword(encryptedPassword);
+                return decryptedPassword == providedPassword;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

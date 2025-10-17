@@ -1,60 +1,31 @@
-﻿using ASI.Basecode.Data.Models;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using ASI.Basecode.Data.Models;
 
 namespace ASI.Basecode.Data
 {
-    public partial class AsiBasecodeDBContext : DbContext
+    public class MarshallContext : DbContext
     {
-        public AsiBasecodeDBContext()
-        {
-        }
+        public MarshallContext(DbContextOptions<MarshallContext> options) : base(options) { }
 
-        public AsiBasecodeDBContext(DbContextOptions<AsiBasecodeDBContext> options)
-            : base(options)
-        {
-        }
+        public DbSet<User> Users { get; set; }
+        public DbSet<Room> Rooms { get; set; }
+        public DbSet<RoomAmenity> RoomAmenities { get; set; }
+        public DbSet<Booking> Bookings { get; set; }
 
-        public virtual DbSet<User> Users { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<User>(entity =>
-            {
-                entity.HasIndex(e => e.UserId, "UQ__Users__1788CC4D5F4A160F")
-                    .IsUnique();
+            modelBuilder.Entity<RoomAmenity>()
+                .HasKey(ra => new { ra.RoomId, ra.Amenity });
 
-                entity.Property(e => e.CreatedBy)
-                    .IsRequired()
-                    .HasMaxLength(50)
-                    .IsUnicode(false);
+            modelBuilder.Entity<Booking>()
+                .HasOne(b => b.User)
+                .WithMany()
+                .HasForeignKey(b => b.UserId);
 
-                entity.Property(e => e.CreatedTime).HasColumnType("datetime");
-
-                entity.Property(e => e.Name)
-                    .IsRequired()
-                    .HasMaxLength(50)
-                    .IsUnicode(false);
-
-                entity.Property(e => e.Password)
-                    .IsRequired()
-                    .HasMaxLength(50)
-                    .IsUnicode(false);
-
-                entity.Property(e => e.UpdatedBy)
-                    .IsRequired()
-                    .HasMaxLength(50)
-                    .IsUnicode(false);
-
-                entity.Property(e => e.UpdatedTime).HasColumnType("datetime");
-
-                entity.Property(e => e.UserId)
-                    .IsRequired()
-                    .HasMaxLength(50)
-                    .IsUnicode(false);
-            });
-
-            OnModelCreatingPartial(modelBuilder);
+            modelBuilder.Entity<Booking>()
+                .HasOne(b => b.Room)
+                .WithMany()
+                .HasForeignKey(b => b.RoomId);
         }
-
-        partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
     }
 }
