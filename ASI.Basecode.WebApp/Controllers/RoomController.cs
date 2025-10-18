@@ -2,6 +2,7 @@ using ASI.Basecode.Data.Models;
 using ASI.Basecode.Services.Interfaces;
 using ASI.Basecode.WebApp.Mvc;
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +27,8 @@ namespace ASI.Basecode.WebApp.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
+        [Route("rooms")]
         public IActionResult GetAll()
         {
             var rooms = _roomService.GetAllRooms();

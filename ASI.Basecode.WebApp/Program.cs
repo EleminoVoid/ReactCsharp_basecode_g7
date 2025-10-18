@@ -20,6 +20,19 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     ContentRootPath = Directory.GetCurrentDirectory(),
 });
 
+// Configure URLs
+builder.WebHost.UseUrls("http://localhost:5000", "https://localhost:5001");
+
+// Configure Kestrel to use specific ports
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ListenAnyIP(5000); // HTTP port
+    serverOptions.ListenAnyIP(5001, listenOptions => // HTTPS port
+    {
+        listenOptions.UseHttps();
+    });
+});
+
 // Load configuration
 builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
@@ -49,6 +62,11 @@ builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddScoped<IRoomAmenityService, RoomAmenityService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
+// Authentication services
+builder.Services.AddScoped<ASI.Basecode.WebApp.Authentication.SignInManager>();
+builder.Services.AddScoped<ASI.Basecode.WebApp.Authentication.TokenProviderOptionsFactory>();
+builder.Services.AddScoped<ASI.Basecode.WebApp.Authentication.TokenValidationParametersFactory>();
+
 // AutoMapper
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
@@ -57,13 +75,26 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.SetIsOriginAllowed(_ => true) // Allow any origin in development
+              .AllowAnyMethod()
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowCredentials();
     });
 });
 
 builder.Services.AddControllers();
+
+// Add Distributed Cache and Session support
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// Add HTTP Context Accessor
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
@@ -74,9 +105,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
-app.UseCors("AllowReact");
+app.UseCors("AllowReact"); // CORS must be before Auth
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
+app.UseSession(); // Add session middleware
+app.MapControllers().RequireCors("AllowReact");
 
 app.Run();
