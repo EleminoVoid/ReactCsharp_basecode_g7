@@ -10,11 +10,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Threading.Tasks;
 
 namespace ASI.Basecode.WebApp.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [ApiController]
+    [Route("api/users")]
     public class AccountController : ControllerBase<AccountController>
     {
         private readonly SessionManager _sessionManager;
@@ -57,8 +59,7 @@ namespace ASI.Basecode.WebApp.Controllers
         /// <summary>
         /// Login Method
         /// </summary>
-
-        [HttpPost]
+        [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginViewModel model)
         {
@@ -67,7 +68,8 @@ namespace ASI.Basecode.WebApp.Controllers
                 return BadRequest(ModelState);
             }
 
-            var user = await _userService.GetUser(model.UserId);
+            // Look up user by username or email, not by ID
+            var user = await _userService.GetUserByUsernameOrEmail(model.UserId);
             if (user == null)
             {
                 return Unauthorized("Invalid username or password");
@@ -94,12 +96,82 @@ namespace ASI.Basecode.WebApp.Controllers
         /// <summary>
         /// Sign Out current account
         /// </summary>
+        [HttpPost("signout")]
         [AllowAnonymous]
-        [HttpPost]
         public async Task<IActionResult> SignOutUser()
         {
             await this._signInManager.SignOutAsync();
             this._session.Clear();
+            return Ok();
+        }
+
+        /// <summary>
+        /// Get all users
+        /// </summary>
+        [HttpGet]
+        [AllowAnonymous]  // Change this based on your auth requirements
+        public IActionResult GetAll()
+        {
+            var users = _userService.GetAllUsers();
+            return Ok(users);
+        }
+
+        /// <summary>
+        /// Add a new user
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> AddUser([FromBody] User user)
+        {
+            try
+            {
+                // Validate model state
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new { message = "Invalid user data", errors = ModelState });
+                }
+
+                // Check if password is provided
+                if (string.IsNullOrEmpty(user.Password))
+                {
+                    return BadRequest(new { message = "Password is required" });
+                }
+
+                // Add user
+                await _userService.AddUser(user);
+
+                // Return success response with user data (without password)
+                return Ok(new
+                {
+                    message = "User registered successfully",
+                    success = true,
+                    user = new
+                    {
+                        user.Id,
+                        user.Username,
+                        user.Email,
+                        user.Role,
+                        user.CreatedAt
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                // Log the exception
+                _logger.LogError(ex, "Error registering user");
+                return StatusCode(500, new { message = "Failed to register user", success = false, error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Delete a user by ID
+        /// </summary>
+        [HttpDelete("{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            // Your logic to delete user
+            await _userService.DeleteUser(id);
             return Ok();
         }
     }

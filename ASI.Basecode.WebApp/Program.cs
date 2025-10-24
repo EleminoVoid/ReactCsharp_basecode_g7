@@ -1,19 +1,27 @@
 ﻿using ASI.Basecode.Data;
 using ASI.Basecode.Data.Interfaces;
 using ASI.Basecode.Data.Repositories;
+using ASI.Basecode.Resources.Constants;
 using ASI.Basecode.Services.Interfaces;
+using ASI.Basecode.Services.Manager;
 using ASI.Basecode.Services.Services;
 using ASI.Basecode.WebApp;
+using ASI.Basecode.WebApp.Authentication;
 using ASI.Basecode.WebApp.Extensions.Configuration;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using System;
 using System.IO;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -35,6 +43,9 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 
 // Load configuration
 builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+
+// Initialize PasswordManager with secret key from configuration
+PasswordManager.SetUp(builder.Configuration.GetSection("TokenAuthentication"));
 
 // Logging setup
 builder.Logging
@@ -66,6 +77,42 @@ builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<ASI.Basecode.WebApp.Authentication.SignInManager>();
 builder.Services.AddScoped<ASI.Basecode.WebApp.Authentication.TokenProviderOptionsFactory>();
 builder.Services.AddScoped<ASI.Basecode.WebApp.Authentication.TokenValidationParametersFactory>();
+
+// Configure Authentication
+var token = builder.Configuration.GetTokenAuthentication();
+var signingKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(token.SecretKey));
+
+var tokenValidationParameters = new TokenValidationParameters
+{
+    ValidateIssuerSigningKey = true,
+    IssuerSigningKey = signingKey,
+    ValidateIssuer = true,
+    ValidIssuer = Const.Issuer,
+    ValidateAudience = true,
+    ValidAudience = token.Audience,
+    ValidateLifetime = true,
+    ClockSkew = TimeSpan.Zero
+};
+
+builder.Services.AddAuthentication(Const.AuthenticationScheme)
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.TokenValidationParameters = tokenValidationParameters;
+    })
+    .AddCookie(Const.AuthenticationScheme, options =>
+    {
+        options.Cookie = new CookieBuilder()
+        {
+            IsEssential = true,
+            SameSite = SameSiteMode.Lax,
+            SecurePolicy = CookieSecurePolicy.SameAsRequest,
+            Name = $"MarshallApp_{token.CookieName}"
+        };
+        options.LoginPath = new PathString("/Account/Login");
+        options.AccessDeniedPath = new PathString("/html/Forbidden.html");
+        options.ReturnUrlParameter = "ReturnUrl";
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(token.ExpirationMinutes);
+    });
 
 // AutoMapper
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());

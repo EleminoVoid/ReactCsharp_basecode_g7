@@ -10,7 +10,8 @@ using Microsoft.Extensions.Logging;
 
 namespace ASI.Basecode.WebApp.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [ApiController]
+    [Route("api/bookings")]
     public class BookingController : ControllerBase<BookingController>
     {
         private readonly IBookingService _bookingService;
@@ -28,7 +29,6 @@ namespace ASI.Basecode.WebApp.Controllers
 
         [HttpGet]
         [AllowAnonymous]
-        [Route("bookings")]
         public IActionResult GetAll()
         {
             var bookings = _bookingService.GetAllBookings();

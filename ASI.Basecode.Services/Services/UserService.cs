@@ -3,6 +3,7 @@ using ASI.Basecode.Data.Models;
 using ASI.Basecode.Services.Interfaces;
 using ASI.Basecode.Services.Manager;
 using AutoMapper;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using static ASI.Basecode.Resources.Constants.Enums;
@@ -33,6 +34,39 @@ namespace ASI.Basecode.Services.Services
         public async Task<User> GetUser(string userId)
         {
             return await Task.FromResult(_repository.GetUsers().FirstOrDefault(x => x.Id == userId));
+        }
+
+        public async Task<User> GetUserByUsernameOrEmail(string usernameOrEmail)
+        {
+            return await Task.FromResult(_repository.GetUsers()
+                .FirstOrDefault(x => x.Username.ToLower() == usernameOrEmail.ToLower() || 
+                                     x.Email.ToLower() == usernameOrEmail.ToLower()));
+        }
+
+        public object GetAllUsers()
+        {
+            return _repository.GetUsers().ToList();
+        }
+
+        public async Task AddUser(User user)
+        {
+            // Hash the password before saving
+            user.Password = PasswordManager.EncryptPassword(user.Password);
+            user.CreatedAt = DateTime.Now;
+            user.Id = Guid.NewGuid().ToString();
+            
+            _repository.AddUser(user);
+            await _repository.SaveChangesAsync();
+        }
+
+        public async Task DeleteUser(string id)
+        {
+            var user = _repository.GetUsers().FirstOrDefault(x => x.Id == id);
+            if (user != null)
+            {
+                _repository.DeleteUser(user);
+                await _repository.SaveChangesAsync();
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using ASI.Basecode.Data.Interfaces;
 using ASI.Basecode.Data.Models;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace ASI.Basecode.Data.Repositories
 {
@@ -13,6 +14,21 @@ namespace ASI.Basecode.Data.Repositories
         public IQueryable<User> GetUsers()
         {
             return GetAll();
+        }
+
+        public void AddUser(User user)
+        {
+            Add(user);
+        }
+
+        public void DeleteUser(User user)
+        {
+            Delete(user);
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await UnitOfWork.SaveChangesAsync();
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.Threading.Tasks;
 
 namespace ASI.Basecode.Data.Interfaces
 {
@@ -14,9 +15,16 @@ namespace ASI.Basecode.Data.Interfaces
         /// The database.
         /// </value>
         DbContext Database { get; }
+        
         /// <summary>
         /// Saves the changes to database
         /// </summary>
         void SaveChanges();
+        
+        /// <summary>
+        /// Saves the changes to database asynchronously
+        /// </summary>
+        /// <returns>A task representing the asynchronous operation</returns>
+        Task<int> SaveChangesAsync();
     }
 }
