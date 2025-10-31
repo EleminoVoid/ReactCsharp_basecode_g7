@@ -174,5 +174,49 @@ namespace ASI.Basecode.WebApp.Controllers
             await _userService.DeleteUser(id);
             return Ok();
         }
+
+        /// <summary>
+        /// Change user password
+        /// </summary>
+        [HttpPut("change-password")]
+        [AllowAnonymous] // Change to [Authorize] if you want only authenticated users to change password
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordViewModel model)
+        {
+            try
+            {
+                // Validate model state
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new { message = "Invalid data", errors = ModelState });
+                }
+
+                // Change password
+                var result = await _userService.ChangePassword(model.UserId, model.CurrentPassword, model.NewPassword);
+
+                if (!result)
+                {
+                    return BadRequest(new { 
+                        message = "Failed to change password. Please check your current password.",
+                        success = false 
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Password changed successfully",
+                    success = true
+                });
+            }
+            catch (Exception ex)
+            {
+                // Log the exception
+                _logger.LogError(ex, "Error changing password");
+                return StatusCode(500, new { 
+                    message = "Failed to change password", 
+                    success = false, 
+                    error = ex.Message 
+                });
+            }
+        }
     }
 }

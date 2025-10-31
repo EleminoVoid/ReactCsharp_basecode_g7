@@ -8,6 +8,7 @@ namespace ASI.Basecode.Data.Interfaces
     {
         IQueryable<User> GetUsers();
         void AddUser(User user);
+        void UpdateUser(User user);
         void DeleteUser(User user);
         Task SaveChangesAsync();
     }

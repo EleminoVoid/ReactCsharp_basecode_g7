@@ -68,5 +68,31 @@ namespace ASI.Basecode.Services.Services
                 await _repository.SaveChangesAsync();
             }
         }
+
+        public async Task<bool> ChangePassword(string userId, string currentPassword, string newPassword)
+        {
+            var user = _repository.GetUsers().FirstOrDefault(x => x.Id == userId);
+            
+            if (user == null)
+            {
+                return false;
+            }
+
+            // Verify current password
+            var isValidPassword = PasswordManager.VerifyPassword(currentPassword, user.Password);
+            if (!isValidPassword)
+            {
+                return false;
+            }
+
+            // Update with new password
+            user.Password = PasswordManager.EncryptPassword(newPassword);
+            user.UpdatedAt = DateTime.Now;
+            
+            _repository.UpdateUser(user);
+            await _repository.SaveChangesAsync();
+
+            return true;
+        }
     }
 }

@@ -21,6 +21,11 @@ namespace ASI.Basecode.Data.Repositories
             Add(user);
         }
 
+        public void UpdateUser(User user)
+        {
+            Update(user);
+        }
+
         public void DeleteUser(User user)
         {
             Delete(user);
