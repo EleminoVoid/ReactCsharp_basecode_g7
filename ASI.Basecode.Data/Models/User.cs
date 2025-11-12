@@ -31,6 +31,10 @@ namespace ASI.Basecode.Data.Models
         public DateTime? CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
 
+        // Forgot-password support
+        public string? ResetToken { get; set; }
+        public DateTime? ResetTokenExpires { get; set; }
+
         // Navigation property
         public virtual ICollection<Booking>? Bookings { get; set; }
     }

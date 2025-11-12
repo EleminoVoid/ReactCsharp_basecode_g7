@@ -14,5 +14,9 @@ namespace ASI.Basecode.Services.Interfaces
         Task<User> GetUserByUsernameOrEmail(string usernameOrEmail);
         Task<bool> ChangePassword(string userId, string currentPassword, string newPassword);
         Task DeleteUser(string id);
+
+        // Forgot Password
+        Task<string?> GeneratePasswordResetToken(string usernameOrEmail, int minutesValid = 15);
+        Task<bool> ResetPasswordWithToken(string token, string newPassword);
     }
 }

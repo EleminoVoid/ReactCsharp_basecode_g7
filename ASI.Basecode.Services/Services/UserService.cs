@@ -25,59 +25,41 @@ namespace ASI.Basecode.Services.Services
         {
             user = new User();
             var passwordKey = PasswordManager.EncryptPassword(password);
-            user = _repository.GetUsers().Where(x => x.Id == userId &&
-                                                     x.Password == passwordKey).FirstOrDefault();
-
+            user = _repository.GetUsers().Where(x => x.Id == userId && x.Password == passwordKey).FirstOrDefault();
             return user != null ? LoginResult.Success : LoginResult.Failed;
         }
 
         public async Task<User> GetUser(string userId)
-        {
-            return await Task.FromResult(_repository.GetUsers().FirstOrDefault(x => x.Id == userId));
-        }
+            => await Task.FromResult(_repository.GetUsers().FirstOrDefault(x => x.Id == userId));
 
         public async Task<User> GetUserByUsernameOrEmail(string usernameOrEmail)
-        {
-            return await Task.FromResult(_repository.GetUsers()
-                .FirstOrDefault(x => x.Username.ToLower() == usernameOrEmail.ToLower() || 
-                                     x.Email.ToLower() == usernameOrEmail.ToLower()));
-        }
+            => await Task.FromResult(_repository.GetUsers()
+                   .FirstOrDefault(x => x.Username.ToLower() == usernameOrEmail.ToLower()
+                                     || x.Email.ToLower() == usernameOrEmail.ToLower()));
 
-        public object GetAllUsers()
-        {
-            return _repository.GetUsers().ToList();
-        }
+        public object GetAllUsers() => _repository.GetUsers().ToList();
 
         public async Task AddUser(User user)
         {
-            // Hash the password before saving
             user.Password = PasswordManager.EncryptPassword(user.Password);
             user.CreatedAt = DateTime.Now;
             user.Id = Guid.NewGuid().ToString();
-            
             _repository.AddUser(user);
             await _repository.SaveChangesAsync();
         }
 
         public async Task UpdateUser(User user)
         {
-            var existingUser = _repository.GetUsers().FirstOrDefault(x => x.Id == user.Id);
-            if (existingUser == null)
-            {
-                throw new Exception($"User with ID {user.Id} not found");
-            }
+            var existingUser = _repository.GetUsers().FirstOrDefault(x => x.Id == user.Id)
+                               ?? throw new Exception($"User with ID {user.Id} not found");
 
-            // Update user properties
             existingUser.Username = user.Username;
             existingUser.Email = user.Email;
             existingUser.Role = user.Role;
             existingUser.Avatar = user.Avatar;
-            
-            // Only update password if it was changed (already encrypted from controller)
+
             if (!string.IsNullOrEmpty(user.Password) && user.Password != existingUser.Password)
-            {
                 existingUser.Password = user.Password;
-            }
 
             existingUser.UpdatedBy = user.UpdatedBy;
             existingUser.UpdatedAt = user.UpdatedAt ?? DateTime.Now;
@@ -99,26 +81,42 @@ namespace ASI.Basecode.Services.Services
         public async Task<bool> ChangePassword(string userId, string currentPassword, string newPassword)
         {
             var user = _repository.GetUsers().FirstOrDefault(x => x.Id == userId);
-            
-            if (user == null)
-            {
-                return false;
-            }
+            if (user == null) return false;
+            if (!PasswordManager.VerifyPassword(currentPassword, user.Password)) return false;
 
-            // Verify current password
-            var isValidPassword = PasswordManager.VerifyPassword(currentPassword, user.Password);
-            if (!isValidPassword)
-            {
-                return false;
-            }
-
-            // Update with new password
             user.Password = PasswordManager.EncryptPassword(newPassword);
             user.UpdatedAt = DateTime.Now;
-            
             _repository.UpdateUser(user);
             await _repository.SaveChangesAsync();
+            return true;
+        }
 
+        public async Task<string?> GeneratePasswordResetToken(string usernameOrEmail, int minutesValid = 15)
+        {
+            var user = await GetUserByUsernameOrEmail(usernameOrEmail);
+            if (user == null) return null;
+
+            user.ResetToken = Convert.ToHexString(Guid.NewGuid().ToByteArray()) + Convert.ToHexString(Guid.NewGuid().ToByteArray());
+            user.ResetTokenExpires = DateTime.UtcNow.AddMinutes(minutesValid);
+            _repository.UpdateUser(user);
+            await _repository.SaveChangesAsync();
+            return user.ResetToken;
+        }
+
+        public async Task<bool> ResetPasswordWithToken(string token, string newPassword)
+        {
+            var user = _repository.GetUsers()
+                .FirstOrDefault(u => u.ResetToken == token && u.ResetTokenExpires != null && u.ResetTokenExpires >= DateTime.UtcNow);
+
+            if (user == null) return false;
+
+            user.Password = PasswordManager.EncryptPassword(newPassword);
+            user.ResetToken = null;
+            user.ResetTokenExpires = null;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            _repository.UpdateUser(user);
+            await _repository.SaveChangesAsync();
             return true;
         }
     }
