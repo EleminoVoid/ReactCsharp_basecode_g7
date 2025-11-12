@@ -14,18 +14,30 @@ namespace ASI.Basecode.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Configure composite key for RoomAmenity
             modelBuilder.Entity<RoomAmenity>()
                 .HasKey(ra => new { ra.RoomId, ra.Amenity });
 
+            // Configure Room relationship with RoomAmenity
+            modelBuilder.Entity<RoomAmenity>()
+                .HasOne(ra => ra.Room)
+                .WithMany(r => r.RoomAmenities)
+                .HasForeignKey(ra => ra.RoomId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure User-Booking relationship
             modelBuilder.Entity<Booking>()
                 .HasOne(b => b.User)
-                .WithMany()
-                .HasForeignKey(b => b.UserId);
+                .WithMany(u => u.Bookings)
+                .HasForeignKey(b => b.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
 
+            // Configure Room-Booking relationship
             modelBuilder.Entity<Booking>()
                 .HasOne(b => b.Room)
-                .WithMany()
-                .HasForeignKey(b => b.RoomId);
+                .WithMany(r => r.Bookings)
+                .HasForeignKey(b => b.RoomId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace ASI.Basecode.WebApp.Controllers
@@ -26,18 +27,6 @@ namespace ASI.Basecode.WebApp.Controllers
         private readonly IConfiguration _appConfiguration;
         private readonly IUserService _userService;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AccountController"/> class.
-        /// </summary>
-        /// <param name="signInManager">The sign in manager.</param>
-        /// <param name="localizer">The localizer.</param>
-        /// <param name="userService">The user service.</param>
-        /// <param name="httpContextAccessor">The HTTP context accessor.</param>
-        /// <param name="loggerFactory">The logger factory.</param>
-        /// <param name="configuration">The configuration.</param>
-        /// <param name="mapper">The mapper.</param>
-        /// <param name="tokenValidationParametersFactory">The token validation parameters factory.</param>
-        /// <param name="tokenProviderOptionsFactory">The token provider tions factory.</param>
         public AccountController(
                             SignInManager signInManager,
                             IHttpContextAccessor httpContextAccessor,
@@ -68,28 +57,31 @@ namespace ASI.Basecode.WebApp.Controllers
                 return BadRequest(ModelState);
             }
 
-            // Look up user by username or email, not by ID
             var user = await _userService.GetUserByUsernameOrEmail(model.UserId);
             if (user == null)
             {
-                return Unauthorized("Invalid username or password");
+                return Unauthorized(new { message = "Invalid username or password" });
             }
 
             var isValidPassword = PasswordManager.VerifyPassword(model.Password, user.Password);
             if (!isValidPassword)
             {
-                return Unauthorized("Invalid username or password");
+                return Unauthorized(new { message = "Invalid username or password" });
             }
 
             await this._signInManager.SignInAsync(user);
             this._session.SetString("HasSession", "Exist");
             this._session.SetString("UserName", user.Username);
+            this._session.SetString("UserId", user.Id);
+            this._session.SetString("UserRole", user.Role);
 
             return Ok(new { 
                 user.Id,
                 user.Username,
                 user.Email,
-                user.Role
+                user.Role,
+                user.Avatar,
+                message = "Login successful"
             });
         }
 
@@ -102,45 +94,135 @@ namespace ASI.Basecode.WebApp.Controllers
         {
             await this._signInManager.SignOutAsync();
             this._session.Clear();
-            return Ok();
+            return Ok(new { message = "Logged out successfully" });
         }
 
         /// <summary>
         /// Get all users
         /// </summary>
         [HttpGet]
-        [AllowAnonymous]  // Change this based on your auth requirements
-        public IActionResult GetAll()
-        {
-            var users = _userService.GetAllUsers();
-            return Ok(users);
-        }
-
-        /// <summary>
-        /// Add a new user
-        /// </summary>
-        [HttpPost]
         [AllowAnonymous]
-        public async Task<IActionResult> AddUser([FromBody] User user)
+        public IActionResult GetAll()
         {
             try
             {
-                // Validate model state
+                var users = _userService.GetAllUsers();
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all users");
+                return StatusCode(500, new { message = "Failed to retrieve users", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get user by ID
+        /// </summary>
+        [HttpGet("{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetById(string id)
+        {
+            try
+            {
+                var user = await _userService.GetUser(id);
+                if (user == null)
+                {
+                    return NotFound(new { message = $"User with ID {id} not found" });
+                }
+
+                // Return user without password
+                return Ok(new
+                {
+                    user.Id,
+                    user.Username,
+                    user.Email,
+                    user.Role,
+                    user.Avatar,
+                    user.CreatedAt,
+                    user.UpdatedAt,
+                    user.CreatedBy,
+                    user.UpdatedBy
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting user {id}");
+                return StatusCode(500, new { message = "Failed to retrieve user", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Search users by username or email
+        /// </summary>
+        [HttpGet("search")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Search([FromQuery] string query)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    return BadRequest(new { message = "Search query is required" });
+                }
+
+                var user = await _userService.GetUserByUsernameOrEmail(query);
+                if (user == null)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                // Return user without password
+                return Ok(new
+                {
+                    user.Id,
+                    user.Username,
+                    user.Email,
+                    user.Role,
+                    user.Avatar,
+                    user.CreatedAt
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error searching user {query}");
+                return StatusCode(500, new { message = "Failed to search user", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Register/Add a new user
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> Register([FromBody] RegisterUserRequest request)
+        {
+            try
+            {
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(new { message = "Invalid user data", errors = ModelState });
                 }
 
-                // Check if password is provided
-                if (string.IsNullOrEmpty(user.Password))
+                // Check if username already exists
+                var existingUser = await _userService.GetUserByUsernameOrEmail(request.Username);
+                if (existingUser != null)
                 {
-                    return BadRequest(new { message = "Password is required" });
+                    return BadRequest(new { message = "Username or email already exists" });
                 }
 
-                // Add user
+                var user = new User
+                {
+                    Username = request.Username,
+                    Email = request.Email,
+                    Password = request.Password,
+                    Role = request.Role ?? "User",
+                    Avatar = request.Avatar,
+                    CreatedBy = request.CreatedBy
+                };
+
                 await _userService.AddUser(user);
 
-                // Return success response with user data (without password)
                 return Ok(new
                 {
                     message = "User registered successfully",
@@ -151,15 +233,136 @@ namespace ASI.Basecode.WebApp.Controllers
                         user.Username,
                         user.Email,
                         user.Role,
+                        user.Avatar,
                         user.CreatedAt
                     }
                 });
             }
             catch (Exception ex)
             {
-                // Log the exception
                 _logger.LogError(ex, "Error registering user");
                 return StatusCode(500, new { message = "Failed to register user", success = false, error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Update user details
+        /// </summary>
+        [HttpPut("{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUserRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new { message = "Invalid user data", errors = ModelState });
+                }
+
+                var user = await _userService.GetUser(id);
+                if (user == null)
+                {
+                    return NotFound(new { message = $"User with ID {id} not found" });
+                }
+
+                // Check if new username/email already exists (excluding current user)
+                if (!string.IsNullOrEmpty(request.Username) && request.Username != user.Username)
+                {
+                    var existingUser = await _userService.GetUserByUsernameOrEmail(request.Username);
+                    if (existingUser != null && existingUser.Id != id)
+                    {
+                        return BadRequest(new { message = "Username already exists" });
+                    }
+                    user.Username = request.Username;
+                }
+
+                if (!string.IsNullOrEmpty(request.Email) && request.Email != user.Email)
+                {
+                    var existingUser = await _userService.GetUserByUsernameOrEmail(request.Email);
+                    if (existingUser != null && existingUser.Id != id)
+                    {
+                        return BadRequest(new { message = "Email already exists" });
+                    }
+                    user.Email = request.Email;
+                }
+
+                // Update other fields
+                if (request.Role != null)
+                    user.Role = request.Role;
+
+                if (request.Avatar != null)
+                    user.Avatar = request.Avatar;
+
+                user.UpdatedBy = request.UpdatedBy;
+                user.UpdatedAt = DateTime.Now;
+
+                await _userService.UpdateUser(user);
+
+                return Ok(new
+                {
+                    message = "User updated successfully",
+                    success = true,
+                    user = new
+                    {
+                        user.Id,
+                        user.Username,
+                        user.Email,
+                        user.Role,
+                        user.Avatar,
+                        user.UpdatedAt
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating user {id}");
+                return StatusCode(500, new { message = "Failed to update user", success = false, error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Update user role (Admin only)
+        /// </summary>
+        [HttpPut("{id}/role")]
+        [AllowAnonymous]
+        public async Task<IActionResult> UpdateUserRole(string id, [FromBody] UpdateRoleRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Role))
+                {
+                    return BadRequest(new { message = "Role is required" });
+                }
+
+                var user = await _userService.GetUser(id);
+                if (user == null)
+                {
+                    return NotFound(new { message = $"User with ID {id} not found" });
+                }
+
+                user.Role = request.Role;
+                user.UpdatedBy = request.UpdatedBy;
+                user.UpdatedAt = DateTime.Now;
+
+                await _userService.UpdateUser(user);
+
+                return Ok(new
+                {
+                    message = "User role updated successfully",
+                    success = true,
+                    user = new
+                    {
+                        user.Id,
+                        user.Username,
+                        user.Role,
+                        user.UpdatedAt
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating user role {id}");
+                return StatusCode(500, new { message = "Failed to update role", success = false, error = ex.Message });
             }
         }
 
@@ -170,9 +373,143 @@ namespace ASI.Basecode.WebApp.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> DeleteUser(string id)
         {
-            // Your logic to delete user
-            await _userService.DeleteUser(id);
-            return Ok();
+            try
+            {
+                var user = await _userService.GetUser(id);
+                if (user == null)
+                {
+                    return NotFound(new { message = $"User with ID {id} not found" });
+                }
+
+                await _userService.DeleteUser(id);
+                return Ok(new { message = "User deleted successfully", success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting user {id}");
+                return StatusCode(500, new { message = "Failed to delete user", success = false, error = ex.Message });
+            }
         }
+
+        /// <summary>
+        /// Change user password (requires current password)
+        /// </summary>
+        [HttpPut("change-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordViewModel model)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new { message = "Invalid data", errors = ModelState });
+                }
+
+                var result = await _userService.ChangePassword(model.UserId, model.CurrentPassword, model.NewPassword);
+
+                if (!result)
+                {
+                    return BadRequest(new { 
+                        message = "Failed to change password. Please check your current password.",
+                        success = false 
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Password changed successfully",
+                    success = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error changing password");
+                return StatusCode(500, new { 
+                    message = "Failed to change password", 
+                    success = false, 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        /// <summary>
+        /// Admin reset user password (no current password required)
+        /// </summary>
+        [HttpPut("{id}/reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword(string id, [FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.NewPassword))
+                {
+                    return BadRequest(new { message = "New password is required" });
+                }
+
+                if (request.NewPassword.Length < 6)
+                {
+                    return BadRequest(new { message = "Password must be at least 6 characters long" });
+                }
+
+                var user = await _userService.GetUser(id);
+                if (user == null)
+                {
+                    return NotFound(new { message = $"User with ID {id} not found" });
+                }
+
+                user.Password = PasswordManager.EncryptPassword(request.NewPassword);
+                user.UpdatedBy = request.UpdatedBy;
+                user.UpdatedAt = DateTime.Now;
+
+                await _userService.UpdateUser(user);
+
+                return Ok(new
+                {
+                    message = "Password reset successfully",
+                    success = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error resetting password for user {id}");
+                return StatusCode(500, new { 
+                    message = "Failed to reset password", 
+                    success = false, 
+                    error = ex.Message 
+                });
+            }
+        }
+    }
+
+    // Request Models
+    public class RegisterUserRequest
+    {
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public string Password { get; set; }
+        public string Role { get; set; }
+        public string Avatar { get; set; }
+        public string CreatedBy { get; set; }
+    }
+
+    public class UpdateUserRequest
+    {
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public string Role { get; set; }
+        public string Avatar { get; set; }
+        public string UpdatedBy { get; set; }
+    }
+
+    public class UpdateRoleRequest
+    {
+        public string Role { get; set; }
+        public string UpdatedBy { get; set; }
+    }
+
+    public class ResetPasswordRequest
+    {
+        public string NewPassword { get; set; }
+        public string UpdatedBy { get; set; }
     }
 }

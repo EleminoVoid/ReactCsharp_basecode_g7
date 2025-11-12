@@ -59,6 +59,33 @@ namespace ASI.Basecode.Services.Services
             await _repository.SaveChangesAsync();
         }
 
+        public async Task UpdateUser(User user)
+        {
+            var existingUser = _repository.GetUsers().FirstOrDefault(x => x.Id == user.Id);
+            if (existingUser == null)
+            {
+                throw new Exception($"User with ID {user.Id} not found");
+            }
+
+            // Update user properties
+            existingUser.Username = user.Username;
+            existingUser.Email = user.Email;
+            existingUser.Role = user.Role;
+            existingUser.Avatar = user.Avatar;
+            
+            // Only update password if it was changed (already encrypted from controller)
+            if (!string.IsNullOrEmpty(user.Password) && user.Password != existingUser.Password)
+            {
+                existingUser.Password = user.Password;
+            }
+
+            existingUser.UpdatedBy = user.UpdatedBy;
+            existingUser.UpdatedAt = user.UpdatedAt ?? DateTime.Now;
+
+            _repository.UpdateUser(existingUser);
+            await _repository.SaveChangesAsync();
+        }
+
         public async Task DeleteUser(string id)
         {
             var user = _repository.GetUsers().FirstOrDefault(x => x.Id == id);
@@ -67,6 +94,32 @@ namespace ASI.Basecode.Services.Services
                 _repository.DeleteUser(user);
                 await _repository.SaveChangesAsync();
             }
+        }
+
+        public async Task<bool> ChangePassword(string userId, string currentPassword, string newPassword)
+        {
+            var user = _repository.GetUsers().FirstOrDefault(x => x.Id == userId);
+            
+            if (user == null)
+            {
+                return false;
+            }
+
+            // Verify current password
+            var isValidPassword = PasswordManager.VerifyPassword(currentPassword, user.Password);
+            if (!isValidPassword)
+            {
+                return false;
+            }
+
+            // Update with new password
+            user.Password = PasswordManager.EncryptPassword(newPassword);
+            user.UpdatedAt = DateTime.Now;
+            
+            _repository.UpdateUser(user);
+            await _repository.SaveChangesAsync();
+
+            return true;
         }
     }
 }
