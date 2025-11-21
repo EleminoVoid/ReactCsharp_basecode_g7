@@ -57,16 +57,16 @@ namespace ASI.Basecode.WebApp.Controllers
                 return BadRequest(ModelState);
             }
 
-            var user = await _userService.GetUserByUsernameOrEmail(model.UserId);
+            var user = await _userService.GetUserByUsernameOrEmail(model.Email);
             if (user == null)
             {
-                return Unauthorized(new { message = "Invalid username or password" });
+                return Unauthorized(new { message = "Invalid email or password" });
             }
 
             var isValidPassword = PasswordManager.VerifyPassword(model.Password, user.Password);
             if (!isValidPassword)
             {
-                return Unauthorized(new { message = "Invalid username or password" });
+                return Unauthorized(new { message = "Invalid email or password" });
             }
 
             await this._signInManager.SignInAsync(user);
