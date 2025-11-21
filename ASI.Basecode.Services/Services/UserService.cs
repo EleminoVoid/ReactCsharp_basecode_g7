@@ -96,18 +96,11 @@ namespace ASI.Basecode.Services.Services
             }
         }
 
-        public async Task<bool> ChangePassword(string userId, string currentPassword, string newPassword)
+        public async Task<bool> ChangePassword(string userId, string newPassword)
         {
             var user = _repository.GetUsers().FirstOrDefault(x => x.Id == userId);
             
             if (user == null)
-            {
-                return false;
-            }
-
-            // Verify current password
-            var isValidPassword = PasswordManager.VerifyPassword(currentPassword, user.Password);
-            if (!isValidPassword)
             {
                 return false;
             }

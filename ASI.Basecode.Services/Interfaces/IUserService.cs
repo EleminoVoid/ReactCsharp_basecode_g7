@@ -12,7 +12,7 @@ namespace ASI.Basecode.Services.Interfaces
         object GetAllUsers();
         Task<User> GetUser(string userId);
         Task<User> GetUserByUsernameOrEmail(string usernameOrEmail);
-        Task<bool> ChangePassword(string userId, string currentPassword, string newPassword);
+        Task<bool> ChangePassword(string userId, string newPassword);
         Task DeleteUser(string id);
     }
 }

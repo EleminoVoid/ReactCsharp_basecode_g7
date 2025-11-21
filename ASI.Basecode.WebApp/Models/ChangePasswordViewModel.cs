@@ -16,13 +16,6 @@ namespace ASI.Basecode.WebApp.Models
         public string UserId { get; set; }
 
         /// <summary>
-        /// Current Password
-        /// </summary>
-        [JsonPropertyName("currentPassword")]
-        [Required(ErrorMessage = "Current password is required.")]
-        public string CurrentPassword { get; set; }
-
-        /// <summary>
         /// New Password
         /// </summary>
         [JsonPropertyName("newPassword")]

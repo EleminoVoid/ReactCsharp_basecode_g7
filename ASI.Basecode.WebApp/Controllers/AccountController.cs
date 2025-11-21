@@ -405,7 +405,7 @@ namespace ASI.Basecode.WebApp.Controllers
                     return BadRequest(new { message = "Invalid data", errors = ModelState });
                 }
 
-                var result = await _userService.ChangePassword(model.UserId, model.CurrentPassword, model.NewPassword);
+                var result = await _userService.ChangePassword(model.UserId, model.NewPassword);
 
                 if (!result)
                 {
